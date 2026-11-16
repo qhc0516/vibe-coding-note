@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>贪吃蛇 · 动态地形</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #f8fafc;
+    --fg: #0f172a;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --card: #ffffff;
+    --primary: #15803d;
+    --primary-hover: #166534;
+    --accent: #a855f7;
+    --danger: #ef4444;
+    --amber: #d97706;
+  }
+  html, body {
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #f8fafc 0%, #ecfdf5 50%, #f1f5f9 100%);
+    color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    gap: 24px;
+  }
+  .inner {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+  /* Header */
+  header {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .logo svg { width: 24px; height: 24px; }
+  h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #0f172a;
+  }
+  @media (min-width: 640px) { h1 { font-size: 30px; } }
+  .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  /* Stats */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    width: 100%;
+  }
+  .stat {
+    background: rgba(255,255,255,0.8);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 12px;
+    text-align: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+  .stat-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: #0f172a;
+    margin-top: 2px;
+  }
+  .stat-value.playing { color: var(--primary); }
+  .stat-value.over { color: var(--danger); }
+  .stat-value.paused { color: var(--amber); }
+  /* Terrain HUD */
+  .terrain-hud {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--muted);
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .terrain-hud b { color: #0f172a; font-weight: 600; }
+  .terrain-hud .sep { color: #cbd5e1; }
+  .legend { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-item { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+  .swatch.wall { background: #475569; }
+  .swatch.puddle { background: rgba(59,130,246,0.6); }
+  .swatch.portal { background: #a855f7; border-radius: 50%; }
+  /* Board */
+  .board-card {
+    width: 100%;
+    max-width: 480px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 15px -3px rgba(21,128,61,0.05);
+    overflow: hidden;
+    padding: 12px;
+  }
+  @media (min-width: 640px) { .board-card { padding: 16px; } }
+  .board-wrap {
+    position: relative;
+    margin: 0 auto;
+    width: 480px;
+    height: 480px;
+    max-width: 100%;
+    max-height: 100%;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    touch-action: none;
+  }
+  /* Wave notice */
+  .wave-notice {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(168,85,247,0.9);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 999px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .wave-notice.show { opacity: 1; }
+  /* Overlay */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    border-radius: 8px;
+    text-align: center;
+    padding: 20px;
+  }
+  .overlay-inner { display: flex; flex-direction: column; gap: 8px; }
+  .overlay-title { font-size: 16px; font-weight: 600; }
+  .overlay-title.idle { color: #1e293b; }
+  .overlay-title.paused { color: var(--amber); }
+  .overlay-title.over { color: var(--danger); }
+  .overlay-sub { font-size: 12px; color: var(--muted); }
+  .overlay-score { font-size: 12px; color: #475569; }
+  .overlay-score b { color: #0f172a; font-weight: 600; }
+  .badge {
+    display: inline-block;
+    margin-left: 6px;
+    background: #fef3c7;
+    color: #b45309;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 500;
+  }
+  /* Controls */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.15s;
+    min-height: 40px;
+    user-select: none;
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: #fff;
+  }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-outline {
+    background: #fff;
+    border-color: #cbd5e1;
+    color: #334155;
+  }
+  .btn-outline:hover { background: #f8fafc; }
+  .btn-large { padding: 12px 24px; font-size: 15px; }
+  /* D-pad (mobile) */
+  .dpad {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .dpad-row { display: flex; gap: 8px; }
+  .dpad-btn {
+    width: 56px;
+    height: 56px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    border-radius: 12px;
+    font-size: 20px;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .dpad-btn:active { background: #ecfdf5; color: var(--primary); }
+  @media (max-width: 640px) { .dpad { display: flex; } }
+  /* Separator */
+  .sep-line {
+    width: 100%;
+    max-width: 480px;
+    height: 1px;
+    background: var(--border);
+  }
+  /* Instructions */
+  .instructions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    width: 100%;
+  }
+  @media (min-width: 640px) { .instructions { grid-template-columns: repeat(3, 1fr); } }
+  .instr {
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.7);
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+  .instr-title { font-size: 14px; font-weight: 500; color: #1e293b; }
+  .instr-desc { font-size: 12px; color: var(--muted); }
+  footer {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 4px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="inner">
+    <!-- Header -->
+    <header>
+      <div class="title-row">
+        <span class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 12c0-2.5 2-4 4.5-4S13 9.5 13 12s-2 4-4.5 4H6"/>
+            <path d="M20 12c0 2.5-2 4-4.5 4"/>
+            <circle cx="18" cy="9" r="0.6" fill="currentColor" stroke="none"/>
+          </svg>
+        </span>
+        <h1>贪吃蛇 · 动态地形</h1>
+      </div>
+      <p class="subtitle">方向键 / WASD 控制，空格暂停。墙上致死，水坑减速，传送门成对瞬移。</p>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">当前分数</div>
+        <div class="stat-value" id="stat-score">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">最高分</div>
+        <div class="stat-value" id="stat-best">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">状态</div>
+        <div class="stat-value" id="stat-status">待开始</div>
+      </div>
+    </div>
+
+    <!-- Terrain HUD -->
+    <div class="terrain-hud">
+      <span>下一波地形: <b id="hud-next">15s</b></span>
+      <span class="sep">|</span>
+      <span>场上地形: <b id="hud-count">0</b></span>
+      <span class="sep">|</span>
+      <span class="legend">
+        <span class="legend-item"><span class="swatch wall"></span>墙</span>
+        <span class="legend-item"><span class="swatch puddle"></span>水坑</span>
+        <span class="legend-item"><span class="swatch portal"></span>门</span>
+      </span>
+    </div>
+
+    <!-- Board -->
+    <div class="board-card">
+      <div class="board-wrap" id="board-wrap">
+        <canvas id="game" width="480" height="480"></canvas>
+        <div class="wave-notice" id="wave-notice">地形出现！</div>
+        <div class="overlay" id="overlay">
+          <div class="overlay-inner" id="overlay-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls" id="controls"></div>
+
+    <!-- D-pad -->
+    <div class="dpad">
+      <button class="dpad-btn" data-dir="UP" aria-label="上">↑</button>
+      <div class="dpad-row">
+        <button class="dpad-btn" data-dir="LEFT" aria-label="左">←</button>
+        <button class="dpad-btn" data-dir="DOWN" aria-label="下">↓</button>
+        <button class="dpad-btn" data-dir="RIGHT" aria-label="右">→</button>
+      </div>
+    </div>
+
+    <div class="sep-line"></div>
+
+    <!-- Instructions -->
+    <div class="instructions">
+      <div class="instr">
+        <div class="instr-title">方向键 / WASD</div>
+        <div class="instr-desc">控制蛇的移动方向</div>
+      </div>
+      <div class="instr">
+        <div class="instr-title">空格键</div>
+        <div class="instr-desc">开始 / 暂停 / 继续</div>
+      </div>
+      <div class="instr">
+        <div class="instr-title">动态地形</div>
+        <div class="instr-desc">墙致死 · 水坑减速 · 传送门瞬移</div>
+      </div>
+    </div>
+
+    <footer>吃到食物 +10 分，速度会随长度加快。地形每 30 秒刷新一波。</footer>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ============== Configuration ==============
+const GRID_SIZE = 20;
+const CELL_SIZE = 24;
+const BOARD_PX = GRID_SIZE * CELL_SIZE;
+const INITIAL_SPEED = 160;
+const MIN_SPEED = 70;
+const SPEED_STEP = 6;
+
+const FIRST_WAVE_AT = 15000;
+const WAVE_INTERVAL = 30000;
+const WAVE_MIN = 2;
+const WAVE_MAX = 4;
+const PUDDLE_TTL = 20000;
+const PORTAL_TTL = 25000;
+const MAX_WALLS = 12;
+const PORTAL_COOLDOWN_MS = 1000;
+const PORTAL_MIN_DIST = 5;
+const PUDDLE_SPEED_MULT = 2;
+
+const DIR_VECTORS = {
+  UP: { x: 0, y: -1 },
+  DOWN: { x: 0, y: 1 },
+  LEFT: { x: -1, y: 0 },
+  RIGHT: { x: 1, y: 0 },
+};
+const OPPOSITE = { UP: 'DOWN', DOWN: 'UP', LEFT: 'RIGHT', RIGHT: 'LEFT' };
+const KEY_TO_DIR = {
+  ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT',
+  w: 'UP', s: 'DOWN', a: 'LEFT', d: 'RIGHT',
+  W: 'UP', S: 'DOWN', A: 'LEFT', D: 'RIGHT',
+};
+
+// ============== State ==============
+let snake, food, dir, queuedDir, status, score, best, deathReason;
+let terrains, gameTime, slowMult, nextTerrainWaveAt;
+let lastTick, lastFrame, speed;
+let rafId = null;
+let lastHudCount = -1, lastHudNext = -1;
+let waveNoticeTimer = null;
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// ============== Helpers ==============
+function manhattan(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
+
+function isReachable(head, target, walls) {
+  const headKey = head.x + ',' + head.y;
+  const targetKey = target.x + ',' + target.y;
+  if (walls.has(headKey) || walls.has(targetKey)) return false;
+  const visited = new Set([headKey]);
+  const queue = [head];
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (cur.x === target.x && cur.y === target.y) return true;
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (let i = 0; i < dirs.length; i++) {
+      const nx = cur.x + dirs[i][0], ny = cur.y + dirs[i][1];
+      const key = nx + ',' + ny;
+      if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
+      if (visited.has(key)) continue;
+      if (walls.has(key)) continue;
+      visited.add(key);
+      queue.push({ x: nx, y: ny });
+    }
+  }
+  return false;
+}
+
+function pickWeightedType() {
+  const r = Math.random();
+  if (r < 0.5) return 'WALL';
+  if (r < 0.8) return 'PUDDLE';
+  return 'PORTAL';
+}
+
+function findValidCells(snakeArr, foodPos, terrainsMap, head, direction) {
+  const occupied = new Set();
+  snakeArr.forEach(p => occupied.add(p.x + ',' + p.y));
+  occupied.add(foodPos.x + ',' + foodPos.y);
+  terrainsMap.forEach((_, key) => occupied.add(key));
+  const v = DIR_VECTORS[direction];
+  for (let i = 1; i <= 3; i++) {
+    occupied.add((head.x + v.x * i) + ',' + (head.y + v.y * i));
+  }
+  const valid = [];
+  for (let x = 1; x < GRID_SIZE - 1; x++) {
+    for (let y = 1; y < GRID_SIZE - 1; y++) {
+      if (!occupied.has(x + ',' + y)) valid.push({ x, y });
+    }
+  }
+  return valid;
+}
+
+function randomFood(snakeArr, terrainsMap) {
+  const occupied = new Set(snakeArr.map(p => p.x + ',' + p.y));
+  terrainsMap.forEach((t, key) => {
+    if (t.type === 'WALL' || t.type === 'PORTAL_A' || t.type === 'PORTAL_B') {
+      occupied.add(key);
+    }
+  });
+  const free = [];
+  for (let x = 0; x < GRID_SIZE; x++) {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      if (!occupied.has(x + ',' + y)) free.push({ x, y });
+    }
+  }
+  if (free.length === 0) return { x: 0, y: 0 };
+  return free[Math.floor(Math.random() * free.length)];
+}
+
+function initialSnake() {
+  const cx = Math.floor(GRID_SIZE / 2);
+  const cy = Math.floor(GRID_SIZE / 2);
+  return [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
+}
+
+function roundRect(x, y, w, h, r) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
+
+// ============== Terrain management ==============
+function cleanupTerrain() {
+  const toDelete = [];
+  const expiredPairs = new Set();
+  terrains.forEach((t, key) => {
+    if (t.ttl !== null && gameTime - t.spawnedAt > t.ttl) {
+      toDelete.push(key);
+      if (t.pairKey) expiredPairs.add(t.pairKey);
+    }
+  });
+  if (expiredPairs.size > 0) {
+    terrains.forEach((t, key) => {
+      if (t.pairKey && expiredPairs.has(t.pairKey) && !toDelete.includes(key)) {
+        toDelete.push(key);
+      }
+    });
+  }
+  toDelete.forEach(k => terrains.delete(k));
+}
+
+function generateWave() {
+  const head = snake[0];
+  let validCells = findValidCells(snake, food, terrains, head, dir);
+  if (validCells.length === 0) return;
+
+  const target = WAVE_MIN + Math.floor(Math.random() * (WAVE_MAX - WAVE_MIN + 1));
+  let placed = 0, attempts = 0;
+  const maxAttempts = target * 12;
+
+  while (placed < target && attempts < maxAttempts && validCells.length > 0) {
+    attempts++;
+    const type = pickWeightedType();
+    const idx = Math.floor(Math.random() * validCells.length);
+
+    if (type === 'PORTAL') {
+      const a = validCells[idx];
+      const candidates = validCells.filter(c => manhattan(a, c) >= PORTAL_MIN_DIST);
+      if (candidates.length === 0) { validCells.splice(idx, 1); continue; }
+      const b = candidates[Math.floor(Math.random() * candidates.length)];
+      const pairKey = 'p_' + gameTime + '_' + placed + '_' + Math.floor(Math.random() * 1000);
+      terrains.set(a.x + ',' + a.y, { type: 'PORTAL_A', x: a.x, y: a.y, spawnedAt: gameTime, ttl: PORTAL_TTL, pairKey });
+      terrains.set(b.x + ',' + b.y, { type: 'PORTAL_B', x: b.x, y: b.y, spawnedAt: gameTime, ttl: PORTAL_TTL, pairKey });
+      placed += 2;
+      validCells = validCells.filter(c => c !== a && c !== b);
+    } else if (type === 'WALL') {
+      let wallCount = 0, oldestKey = null, oldestTime = Infinity;
+      terrains.forEach((t, key) => {
+        if (t.type === 'WALL') {
+          wallCount++;
+          if (t.spawnedAt < oldestTime) { oldestTime = t.spawnedAt; oldestKey = key; }
+        }
+      });
+      if (wallCount >= MAX_WALLS && oldestKey) terrains.delete(oldestKey);
+
+      const cell = validCells[idx];
+      const walls = new Set();
+      terrains.forEach((t, key) => { if (t.type === 'WALL') walls.add(key); });
+      walls.add(cell.x + ',' + cell.y);
+      if (!isReachable(head, food, walls)) { validCells.splice(idx, 1); continue; }
+      terrains.set(cell.x + ',' + cell.y, { type: 'WALL', x: cell.x, y: cell.y, spawnedAt: gameTime, ttl: null });
+      placed++;
+      validCells.splice(idx, 1);
+    } else {
+      const cell = validCells[idx];
+      terrains.set(cell.x + ',' + cell.y, { type: 'PUDDLE', x: cell.x, y: cell.y, spawnedAt: gameTime, ttl: PUDDLE_TTL });
+      placed++;
+      validCells.splice(idx, 1);
+    }
+  }
+}
+
+function checkTerrainEvents() {
+  cleanupTerrain();
+  if (gameTime >= nextTerrainWaveAt) {
+    generateWave();
+    nextTerrainWaveAt += WAVE_INTERVAL;
+    showWaveNotice();
+  }
+  updateTerrainHUD();
+}
+
+function showWaveNotice() {
+  const el = document.getElementById('wave-notice');
+  el.classList.add('show');
+  if (waveNoticeTimer) clearTimeout(waveNoticeTimer);
+  waveNoticeTimer = setTimeout(() => el.classList.remove('show'), 1500);
+}
+
+function updateTerrainHUD() {
+  let count = 0;
+  terrains.forEach(() => count++);
+  const next = Math.max(0, Math.ceil((nextTerrainWaveAt - gameTime) / 1000));
+  if (count !== lastHudCount) {
+    lastHudCount = count;
+    document.getElementById('hud-count').textContent = count;
+  }
+  if (next !== lastHudNext) {
+    lastHudNext = next;
+    document.getElementById('hud-next').textContent = next + 's';
+  }
+}
+
+// ============== Drawing ==============
+function draw() {
+  // Background
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(0, 0, BOARD_PX, BOARD_PX);
+
+  // Grid
+  ctx.strokeStyle = '#e2e8f0';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < GRID_SIZE; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * CELL_SIZE + 0.5, 0);
+    ctx.lineTo(i * CELL_SIZE + 0.5, BOARD_PX);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, i * CELL_SIZE + 0.5);
+    ctx.lineTo(BOARD_PX, i * CELL_SIZE + 0.5);
+    ctx.stroke();
+  }
+
+  // Border
+  ctx.strokeStyle = '#cbd5e1';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, BOARD_PX - 2, BOARD_PX - 2);
+
+  // Terrain
+  terrains.forEach(t => {
+    const tx = t.x * CELL_SIZE, ty = t.y * CELL_SIZE;
+    let alpha = 1;
+    if (t.ttl !== null) {
+      const remaining = t.ttl - (gameTime - t.spawnedAt);
+      if (remaining < 5000) {
+        alpha = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(gameTime / 250));
+      }
+    }
+    ctx.globalAlpha = alpha;
+
+    if (t.type === 'WALL') {
+      ctx.fillStyle = '#475569';
+      roundRect(tx + 1, ty + 1, CELL_SIZE - 2, CELL_SIZE - 2, 4);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(tx + 5, ty + CELL_SIZE - 5);
+      ctx.lineTo(tx + CELL_SIZE - 5, ty + 5);
+      ctx.moveTo(tx + 5, ty + CELL_SIZE - 10);
+      ctx.lineTo(tx + CELL_SIZE - 10, ty + 5);
+      ctx.stroke();
+    } else if (t.type === 'PUDDLE') {
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.35)';
+      roundRect(tx + 2, ty + 2, CELL_SIZE - 4, CELL_SIZE - 4, 6);
+      ctx.fill();
+      const phase = (gameTime / 200) % (Math.PI * 2);
+      ctx.strokeStyle = 'rgba(96, 165, 250, 0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const y = ty + 8 + i * 5;
+        ctx.moveTo(tx + 4, y);
+        ctx.lineTo(tx + CELL_SIZE - 4, y + Math.sin(phase + i * 1.2) * 2);
+      }
+      ctx.stroke();
+    } else if (t.type === 'PORTAL_A' || t.type === 'PORTAL_B') {
+      const cx = tx + CELL_SIZE / 2, cy = ty + CELL_SIZE / 2;
+      const angle = (gameTime / 400) % (Math.PI * 2);
+      ctx.strokeStyle = '#a855f7';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, CELL_SIZE * 0.36, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#c084fc';
+      for (let i = 0; i < 6; i++) {
+        const a = angle + (i * Math.PI) / 3;
+        const px = cx + Math.cos(a) * CELL_SIZE * 0.36;
+        const py = cy + Math.sin(a) * CELL_SIZE * 0.36;
+        ctx.beginPath();
+        ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (t.type === 'PORTAL_B') {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx - 4, cy); ctx.lineTo(cx + 4, cy);
+        ctx.moveTo(cx, cy - 4); ctx.lineTo(cx, cy + 4);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  });
+
+  // Food
+  const fx = food.x * CELL_SIZE, fy = food.y * CELL_SIZE;
+  ctx.fillStyle = '#ef4444';
+  roundRect(fx + 3, fy + 3, CELL_SIZE - 6, CELL_SIZE - 6, 6);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.beginPath();
+  ctx.arc(fx + CELL_SIZE * 0.32, fy + CELL_SIZE * 0.32, CELL_SIZE * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Snake
+  for (let i = snake.length - 1; i >= 0; i--) {
+    const seg = snake[i];
+    const sx = seg.x * CELL_SIZE, sy = seg.y * CELL_SIZE;
+    const pad = i === 0 ? 1 : 2;
+    const t = i / Math.max(snake.length - 1, 1);
+    const r = Math.round(22 - t * 8);
+    const g = Math.round(163 - t * 30);
+    const b = Math.round(74 - t * 10);
+    ctx.fillStyle = i === 0 ? '#15803d' : 'rgb(' + r + ',' + g + ',' + b + ')';
+    roundRect(sx + pad, sy + pad, CELL_SIZE - pad * 2, CELL_SIZE - pad * 2, 7);
+    ctx.fill();
+
+    if (i === 0) {
+      const cx = sx + CELL_SIZE / 2, cy = sy + CELL_SIZE / 2;
+      const off = CELL_SIZE * 0.18, eyeR = CELL_SIZE * 0.08;
+      let e1, e2;
+      if (dir === 'LEFT') { e1 = { x: cx - off, y: cy - off }; e2 = { x: cx - off, y: cy + off }; }
+      else if (dir === 'RIGHT') { e1 = { x: cx + off, y: cy - off }; e2 = { x: cx + off, y: cy + off }; }
+      else if (dir === 'UP') { e1 = { x: cx - off, y: cy - off }; e2 = { x: cx + off, y: cy - off }; }
+      else { e1 = { x: cx - off, y: cy + off }; e2 = { x: cx + off, y: cy + off }; }
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(e1.x, e1.y, eyeR + 1, 0, Math.PI * 2);
+      ctx.arc(e2.x, e2.y, eyeR + 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(e1.x, e1.y, eyeR, 0, Math.PI * 2);
+      ctx.arc(e2.x, e2.y, eyeR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+// ============== Game logic ==============
+function endGame(reason) {
+  status = 'gameOver';
+  deathReason = reason;
+  if (score > best) {
+    best = score;
+    try { localStorage.setItem('snake-best', String(best)); } catch (e) {}
+  }
+  renderUI();
+}
+
+function tick() {
+  const head = snake[0];
+  if (queuedDir && queuedDir !== OPPOSITE[dir]) {
+    dir = queuedDir;
+  }
+  queuedDir = null;
+
+  const v = DIR_VECTORS[dir];
+  let newHead = { x: head.x + v.x, y: head.y + v.y };
+
+  // Boundary
+  if (newHead.x < 0 || newHead.x >= GRID_SIZE || newHead.y < 0 || newHead.y >= GRID_SIZE) {
+    endGame('撞到边界了');
+    return;
+  }
+
+  const headKey = newHead.x + ',' + newHead.y;
+  const terrainAtHead = terrains.get(headKey);
+
+  // Wall
+  if (terrainAtHead && terrainAtHead.type === 'WALL') {
+    endGame('撞上了墙壁');
+    return;
+  }
+
+  // Portal
+  if (terrainAtHead && (terrainAtHead.type === 'PORTAL_A' || terrainAtHead.type === 'PORTAL_B') && terrainAtHead.pairKey) {
+    if (!terrainAtHead.cooldownUntil || gameTime >= terrainAtHead.cooldownUntil) {
+      let pair = null;
+      terrains.forEach(t => {
+        if (t.pairKey === terrainAtHead.pairKey && t !== terrainAtHead) pair = t;
+      });
+      if (pair) {
+        newHead = { x: pair.x, y: pair.y };
+        terrainAtHead.cooldownUntil = gameTime + PORTAL_COOLDOWN_MS;
+        pair.cooldownUntil = gameTime + PORTAL_COOLDOWN_MS;
+      }
+    }
+  }
+
+  // Food + self collision
+  const willEat = newHead.x === food.x && newHead.y === food.y;
+  const bodyToCheck = willEat ? snake : snake.slice(0, snake.length - 1);
+  if (bodyToCheck.some(p => p.x === newHead.x && p.y === newHead.y)) {
+    endGame('咬到自己了');
+    return;
+  }
+
+  // Puddle
+  const finalTerrain = terrains.get(newHead.x + ',' + newHead.y);
+  slowMult = (finalTerrain && finalTerrain.type === 'PUDDLE') ? PUDDLE_SPEED_MULT : 1;
+
+  const next = [newHead].concat(snake);
+  if (willEat) {
+    food = randomFood(next, terrains);
+    score += 10;
+    speed = Math.max(MIN_SPEED, speed - SPEED_STEP);
+    document.getElementById('stat-score').textContent = score;
+  } else {
+    next.pop();
+  }
+  snake = next;
+  draw();
+}
+
+// ============== Game loop ==============
+function step(ts) {
+  rafId = requestAnimationFrame(step);
+  if (status !== 'playing') {
+    lastFrame = 0;
+    lastTick = 0;
+    return;
+  }
+  if (lastFrame === 0) {
+    lastFrame = ts;
+    lastTick = ts;
+    return;
+  }
+  const frameDelta = ts - lastFrame;
+  lastFrame = ts;
+  gameTime += frameDelta;
+
+  checkTerrainEvents();
+
+  const tickInterval = speed * slowMult;
+  if (ts - lastTick >= tickInterval) {
+    lastTick = ts;
+    tick();
+  } else {
+    draw();
+  }
+}
+
+// ============== Controls ==============
+function startGame() {
+  snake = initialSnake();
+  terrains = new Map();
+  food = randomFood(snake, terrains);
+  dir = 'RIGHT';
+  queuedDir = null;
+  speed = INITIAL_SPEED;
+  slowMult = 1;
+  lastTick = 0;
+  lastFrame = 0;
+  gameTime = 0;
+  nextTerrainWaveAt = FIRST_WAVE_AT;
+  lastHudCount = -1;
+  lastHudNext = -1;
+  score = 0;
+  deathReason = null;
+  status = 'playing';
+  document.getElementById('stat-score').textContent = '0';
+  updateTerrainHUD();
+  renderUI();
+  draw();
+}
+
+function togglePause() {
+  if (status === 'playing') status = 'paused';
+  else if (status === 'paused') status = 'playing';
+  renderUI();
+}
+
+function queueDir(newDir) {
+  if (status !== 'playing') return;
+  if (newDir === OPPOSITE[dir]) return;
+  queuedDir = newDir;
+}
+
+// ============== UI rendering ==============
+function renderUI() {
+  const statusEl = document.getElementById('stat-status');
+  const statusText = status === 'idle' ? '待开始' : status === 'playing' ? '进行中' : status === 'paused' ? '已暂停' : '已结束';
+  statusEl.textContent = statusText;
+  statusEl.className = 'stat-value ' + (status === 'playing' ? 'playing' : status === 'gameOver' ? 'over' : status === 'paused' ? 'paused' : '');
+
+  document.getElementById('stat-best').textContent = best;
+
+  // Overlay
+  const overlay = document.getElementById('overlay');
+  const content = document.getElementById('overlay-content');
+  if (status === 'idle' || status === 'paused' || status === 'gameOver') {
+    overlay.style.display = 'flex';
+    if (status === 'idle') {
+      content.innerHTML = '<div class="overlay-title idle">准备好了吗？</div><div class="overlay-sub">按下「开始」或空格键启动游戏</div>';
+    } else if (status === 'paused') {
+      content.innerHTML = '<div class="overlay-title paused">已暂停</div><div class="overlay-sub">按下空格键继续</div>';
+    } else {
+      const newRecord = score >= best && score > 0 ? '<span class="badge">新纪录</span>' : '';
+      content.innerHTML = '<div class="overlay-title over">游戏结束</div><div class="overlay-sub">' + (deathReason || '') + '</div><div class="overlay-score">本局得分 <b>' + score + '</b>' + newRecord + '</div>';
+    }
+  } else {
+    overlay.style.display = 'none';
+  }
+
+  // Buttons
+  const controls = document.getElementById('controls');
+  controls.innerHTML = '';
+  if (status === 'idle' || status === 'gameOver') {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary btn-large';
+    btn.textContent = status === 'idle' ? '开始游戏' : '重新开始';
+    btn.onclick = startGame;
+    controls.appendChild(btn);
+  } else if (status === 'playing') {
+    const pause = document.createElement('button');
+    pause.className = 'btn btn-outline btn-large';
+    pause.textContent = '暂停';
+    pause.onclick = togglePause;
+    controls.appendChild(pause);
+    const restart = document.createElement('button');
+    restart.className = 'btn btn-outline btn-large';
+    restart.textContent = '重新开始';
+    restart.onclick = startGame;
+    controls.appendChild(restart);
+  } else if (status === 'paused') {
+    const resume = document.createElement('button');
+    resume.className = 'btn btn-primary btn-large';
+    resume.textContent = '继续';
+    resume.onclick = togglePause;
+    controls.appendChild(resume);
+    const restart = document.createElement('button');
+    restart.className = 'btn btn-outline btn-large';
+    restart.textContent = '重新开始';
+    restart.onclick = startGame;
+    controls.appendChild(restart);
+  }
+}
+
+// ============== Event handlers ==============
+window.addEventListener('keydown', (e) => {
+  if (e.key === ' ') {
+    e.preventDefault();
+    if (status === 'playing' || status === 'paused') togglePause();
+    else if (status === 'idle' || status === 'gameOver') startGame();
+    return;
+  }
+  const d = KEY_TO_DIR[e.key];
+  if (!d) return;
+  e.preventDefault();
+  queueDir(d);
+});
+
+// D-pad
+document.querySelectorAll('.dpad-btn').forEach(btn => {
+  const d = btn.getAttribute('data-dir');
+  const handler = (e) => {
+    e.preventDefault();
+    queueDir(d);
+  };
+  btn.addEventListener('pointerdown', handler);
+});
+
+// Touch swipe on canvas
+let touchStart = null;
+canvas.addEventListener('touchstart', (e) => {
+  const t = e.touches[0];
+  touchStart = { x: t.clientX, y: t.clientY };
+}, { passive: true });
+canvas.addEventListener('touchend', (e) => {
+  if (!touchStart) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - touchStart.x;
+  const dy = t.clientY - touchStart.y;
+  touchStart = null;
+  if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
+  let d;
+  if (Math.abs(dx) > Math.abs(dy)) d = dx > 0 ? 'RIGHT' : 'LEFT';
+  else d = dy > 0 ? 'DOWN' : 'UP';
+  queueDir(d);
+}, { passive: true });
+
+// ============== Init ==============
+function init() {
+  snake = initialSnake();
+  terrains = new Map();
+  food = randomFood(snake, terrains);
+  dir = 'RIGHT';
+  queuedDir = null;
+  status = 'idle';
+  score = 0;
+  deathReason = null;
+  speed = INITIAL_SPEED;
+  slowMult = 1;
+  lastTick = 0;
+  lastFrame = 0;
+  gameTime = 0;
+  nextTerrainWaveAt = FIRST_WAVE_AT;
+  lastHudCount = -1;
+  lastHudNext = -1;
+  try {
+    const stored = localStorage.getItem('snake-best');
+    best = stored ? parseInt(stored, 10) || 0 : 0;
+  } catch (e) { best = 0; }
+
+  document.getElementById('stat-best').textContent = best;
+  updateTerrainHUD();
+  renderUI();
+  draw();
+  rafId = requestAnimationFrame(step);
+}
+
+init();
+</script>
+</body>
+</html>
