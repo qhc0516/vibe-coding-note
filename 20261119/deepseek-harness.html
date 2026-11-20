@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DeepSeek Harness</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --side:#f6f6f7;
+    --line:#ececee;
+    --line-soft:#f0f0f2;
+    --text:#1e1f23;
+    --text-2:#5d5f66;
+    --muted:#91939a;
+    --blue:#4d7cfb;
+    --blue-soft:#eef3ff;
+    --hover:#ececef;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    font-size:13px;
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit;}
+  svg{display:block;}
+
+  .app{
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  /* ---------- 顶部窗口栏 ---------- */
+  .titlebar{
+    height:36px;
+    flex:0 0 36px;
+    display:flex;
+    align-items:center;
+    gap:4px;
+    padding-left:10px;
+    background:#fff;
+    user-select:none;
+  }
+  .tb-btn{
+    width:26px;height:26px;border-radius:6px;
+    display:grid;place-items:center;color:#4a4b51;
+    transition:background .15s;
+  }
+  .tb-btn:hover{background:#f1f1f3;}
+  .tb-menu{
+    padding:4px 9px;border-radius:6px;font-size:12.5px;color:#33343a;
+    transition:background .15s;
+  }
+  .tb-menu:hover{background:#f1f1f3;}
+  .tb-right{margin-left:auto;display:flex;align-items:center;height:100%;}
+  .win-btn{
+    width:44px;height:36px;display:grid;place-items:center;color:#5c5d63;
+    transition:background .15s,color .15s;
+  }
+  .win-btn:hover{background:#f1f1f3;}
+  .win-btn.close:hover{background:#e81123;color:#fff;}
+
+  /* ---------- 主体 ---------- */
+  .body{flex:1;display:flex;min-height:0;}
+
+  /* ---------- 侧边栏 ---------- */
+  .sidebar{
+    width:226px;
+    flex:0 0 226px;
+    background:var(--side);
+    display:flex;
+    flex-direction:column;
+    padding:0 10px 10px;
+    overflow:hidden;
+    transition:width .25s ease,flex-basis .25s ease,opacity .2s,padding .25s;
+  }
+  .sidebar.collapsed{
+    width:0;flex-basis:0;padding-left:0;padding-right:0;opacity:0;
+  }
+  .side-inner{width:206px;display:flex;flex-direction:column;height:100%;}
+
+  .brand{
+    display:flex;align-items:center;gap:6px;
+    height:44px;padding:0 4px 0 2px;
+  }
+  .brand-logo{width:20px;height:20px;color:#111;}
+  .brand-name{
+    font-size:16.5px;font-weight:700;letter-spacing:-.5px;color:#131418;
+  }
+  .brand-badge{
+    margin-left:1px;
+    font-size:8.5px;font-weight:600;letter-spacing:.7px;
+    color:#fff;background:#16171a;
+    padding:2px 4px;border-radius:3px;
+    transform:translateY(-2px);
+  }
+
+  .new-chat{
+    margin-top:4px;
+    height:33px;width:100%;
+    display:flex;align-items:center;justify-content:center;gap:7px;
+    background:#fff;
+    border:1px solid #e9e9ec;
+    border-radius:9px;
+    font-size:13px;color:#2a2b30;
+    box-shadow:0 1px 2px rgba(0,0,0,.04);
+    transition:box-shadow .16s,border-color .16s,transform .08s;
+  }
+  .new-chat:hover{border-color:#dcdce0;box-shadow:0 2px 8px rgba(0,0,0,.07);}
+  .new-chat:active{transform:scale(.985);}
+
+  .nav{margin-top:12px;display:flex;flex-direction:column;gap:1px;}
+  .nav-item{
+    display:flex;align-items:center;gap:10px;
+    height:30px;padding:0 8px;border-radius:7px;
+    font-size:13px;color:#3b3c42;
+    transition:background .14s,color .14s;
+    text-align:left;width:100%;
+  }
+  .nav-item svg{color:#5f6066;transition:color .14s;}
+  .nav-item:hover{background:var(--hover);}
+  .nav-item.active{background:#e7e7ea;color:#131418;font-weight:500;}
+  .nav-item.active svg{color:#131418;}
+
+  .ws-header{
+    display:flex;align-items:center;
+    margin-top:22px;padding:0 4px 0 8px;height:24px;
+  }
+  .ws-title{font-size:12px;color:var(--muted);}
+  .ws-actions{margin-left:auto;display:flex;align-items:center;gap:2px;}
+  .mini-btn{
+    width:22px;height:22px;border-radius:5px;display:grid;place-items:center;color:#84858c;
+    transition:background .14s,color .14s;
+  }
+  .mini-btn:hover{background:#e8e8eb;color:#2c2d33;}
+
+  .ws-item{
+    display:flex;align-items:center;gap:9px;
+    height:30px;padding:0 8px;margin-top:3px;border-radius:7px;
+    font-size:13px;color:#3b3c42;width:100%;text-align:left;
+    transition:background .14s;
+  }
+  .ws-item:hover{background:var(--hover);}
+  .ws-item.active{background:#e7e7ea;}
+
+  .side-bottom{margin-top:auto;display:flex;flex-direction:column;gap:8px;}
+  .user-row{
+    display:flex;align-items:center;gap:8px;
+    height:32px;padding:0 4px;border-radius:8px;
+    transition:background .14s;
+  }
+  .user-row:hover{background:var(--hover);}
+  .avatar{
+    width:24px;height:24px;border-radius:50%;
+    display:grid;place-items:center;
+    font-size:11px;font-weight:600;color:#fff;
+    background:linear-gradient(145deg,#6f8ea8,#3f576d);
+    flex:0 0 24px;
+  }
+  .user-name{font-size:12.5px;color:#2f3036;}
+  .ver-btn{
+    margin-left:auto;
+    display:flex;align-items:center;gap:4px;
+    height:23px;padding:0 7px;
+    border-radius:6px;
+    background:#e8eefc;color:#3f6ff5;
+    font-size:11.5px;
+    transition:background .15s,transform .08s;
+  }
+  .ver-btn:hover{background:#dde7fc;}
+  .ver-btn:active{transform:scale(.96);}
+
+  /* ---------- 主区域 ---------- */
+  .main{
+    flex:1;min-width:0;background:#fff;
+    display:flex;flex-direction:column;
+    position:relative;
+  }
+  .main-topbar{
+    height:38px;flex:0 0 38px;
+    display:flex;align-items:center;justify-content:flex-end;
+    padding:0 12px;
+  }
+  .panel-btn{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:#7c7d84;transition:background .15s,color .15s;}
+  .panel-btn:hover{background:#f2f2f4;color:#2c2d33;}
+
+  .stage{
+    flex:1;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    padding:0 24px 96px;
+    min-height:0;
+  }
+  .stage-inner{width:100%;max-width:560px;}
+
+  .hero{
+    display:flex;align-items:center;justify-content:center;gap:9px;
+    margin-bottom:22px;
+  }
+  .hero-logo{width:29px;height:29px;color:#141519;}
+  .hero-text{
+    font-size:26px;font-weight:600;letter-spacing:.5px;color:#15161a;
+  }
+  .hero-badge{
+    align-self:center;
+    font-size:11px;color:#6f5fd0;background:#f0ecfb;
+    padding:2.5px 7px;border-radius:5px;
+    transform:translateY(-6px);
+    white-space:nowrap;
+  }
+
+  .meta-row{
+    display:flex;align-items:center;gap:14px;
+    padding:0 6px 12px;
+    font-size:12.5px;color:#6a6b72;
+  }
+  .meta-btn{
+    display:flex;align-items:center;gap:5px;
+    padding:4px 6px;border-radius:6px;
+    color:#6a6b72;font-size:12.5px;
+    white-space:nowrap;
+    transition:background .14s,color .14s;
+  }
+  .meta-btn:hover{background:#f3f3f5;color:#2b2c32;}
+  .meta-btn svg{color:#8b8c93;}
+  .meta-chev{color:#a3a4ab;transition:transform .18s;}
+  .menu-wrap.open .meta-chev{transform:rotate(180deg);}
+
+  /* ---------- 输入卡片 ---------- */
+  .composer{
+    background:#fff;
+    border:1px solid #ebebee;
+    border-radius:20px;
+    padding:14px 14px 10px 16px;
+    box-shadow:0 4px 18px rgba(20,22,30,.05),0 1px 3px rgba(20,22,30,.03);
+    transition:border-color .18s,box-shadow .18s;
+  }
+  .composer.focus{
+    border-color:#dfe2ea;
+    box-shadow:0 8px 26px rgba(20,22,30,.08),0 1px 3px rgba(20,22,30,.04);
+  }
+  .composer textarea{
+    width:100%;border:0;outline:none;resize:none;
+    font-family:inherit;font-size:13.5px;line-height:1.6;
+    color:#22232a;background:transparent;
+    min-height:46px;max-height:150px;
+    padding:2px 2px 0;
+  }
+  .composer textarea::placeholder{color:#9c9da4;}
+
+  .composer-foot{
+    display:flex;align-items:center;gap:8px;
+    margin-top:6px;
+  }
+  .foot-left{display:flex;align-items:center;gap:8px;}
+  .foot-right{margin-left:auto;display:flex;align-items:center;gap:7px;}
+
+  .round-btn{
+    width:30px;height:30px;border-radius:50%;
+    display:grid;place-items:center;
+    background:#f5f5f7;color:#5b5c63;
+    border:1px solid #eeeef1;
+    transition:background .15s,transform .08s;
+  }
+  .round-btn:hover{background:#ececef;}
+  .round-btn:active{transform:scale(.94);}
+
+  .scope-btn{
+    display:flex;align-items:center;gap:6px;
+    height:30px;padding:0 7px;border-radius:7px;
+    font-size:12.5px;color:#63646b;
+    white-space:nowrap;
+    transition:background .15s,color .15s;
+  }
+  .scope-btn:hover{background:#f4f4f6;color:#2b2c32;}
+
+  .model{font-size:12px;color:#3c3d44;white-space:nowrap;}
+  .model-tag{
+    font-size:11px;color:#3f6ff5;background:var(--blue-soft);
+    padding:1.5px 5px;border-radius:4px;
+    margin-left:-2px;
+  }
+  .high-btn{
+    display:flex;align-items:center;gap:4px;
+    font-size:12px;color:#4a4b52;
+    padding:3px 5px;border-radius:6px;
+    white-space:nowrap;
+    transition:background .15s;
+  }
+  .high-btn:hover{background:#f4f4f6;}
+
+  .send-btn{
+    width:32px;height:32px;border-radius:50%;
+    display:grid;place-items:center;
+    background:var(--blue);color:#fff;
+    margin-left:2px;
+    opacity:.5;
+    transition:opacity .18s,transform .1s,background .18s;
+  }
+  .send-btn.ready{opacity:1;}
+  .send-btn:hover{background:#4574f2;}
+  .send-btn:active{transform:scale(.93);}
+
+  /* ---------- 弹出菜单 ---------- */
+  .menu-wrap{position:relative;}
+  .menu{
+    position:absolute;
+    bottom:calc(100% + 8px);left:0;
+    min-width:168px;
+    background:#fff;
+    border:1px solid #ececee;
+    border-radius:10px;
+    box-shadow:0 10px 30px rgba(20,22,30,.12);
+    padding:5px;
+    display:none;
+    z-index:40;
+  }
+  .menu-wrap.drop-down .menu{bottom:auto;top:calc(100% + 6px);}
+  .menu-wrap.align-right .menu{left:auto;right:0;}
+  .menu-wrap.open .menu{display:block;animation:pop .14s ease-out;}
+  @keyframes pop{from{opacity:0;transform:translateY(4px) scale(.98);}to{opacity:1;transform:none;}}
+  .menu-item{
+    display:flex;align-items:center;gap:8px;
+    width:100%;padding:7px 9px;border-radius:7px;
+    font-size:12.5px;color:#33343a;text-align:left;
+    transition:background .12s;
+  }
+  .menu-item:hover{background:#f5f5f7;}
+  .menu-item .tick{margin-left:auto;color:var(--blue);opacity:0;}
+  .menu-item.active .tick{opacity:1;}
+
+  /* ---------- 吉祥物（可点击互动） ---------- */
+  .mascot{
+    position:fixed;right:0;bottom:0;
+    width:188px;
+    cursor:pointer;
+    user-select:none;
+    -webkit-user-select:none;
+    touch-action:manipulation;
+    mix-blend-mode:multiply;
+    opacity:.98;
+    z-index:20;
+  }
+  .mascot img{
+    width:100%;display:block;
+    transform-origin:50% 100%;
+    will-change:transform;
+    pointer-events:none;
+    -webkit-user-drag:none;
+    transition:transform .16s ease;
+  }
+  .mascot:hover img{transform:scale(1.035);}
+  .mascot:active img{transform:scale(.97,1.02);}
+
+  /* ---------- 提示条 ---------- */
+  .toast{
+    position:fixed;left:50%;bottom:34px;
+    transform:translate(-50%,12px);
+    background:rgba(24,25,30,.92);
+    color:#fff;font-size:12px;
+    padding:8px 14px;border-radius:8px;
+    opacity:0;pointer-events:none;
+    transition:opacity .2s,transform .2s;
+    z-index:99;
+    white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#dcdce0;border-radius:4px;}
+  ::-webkit-scrollbar-thumb:hover{background:#c8c8ce;}
+
+  @media (max-width:760px){
+    .mascot{width:130px;}
+    .hero-text{font-size:21px;}
+    .stage{padding-bottom:60px;}
+  }
+  @media (max-width:620px){
+    .model,.model-tag{display:none;}
+    .foot-left{gap:2px;}
+    .composer-foot{gap:4px;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 顶部窗口栏 -->
+  <div class="titlebar">
+    <button class="tb-btn" id="toggleSide" title="切换侧栏">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/>
+      </svg>
+    </button>
+    <button class="tb-menu">应用</button>
+    <button class="tb-menu">编辑</button>
+
+    <div class="tb-right">
+      <button class="win-btn" data-win="min" title="最小化">
+        <svg width="11" height="11" viewBox="0 0 12 12"><path d="M2 6.5h8" stroke="currentColor" stroke-width="1.1"/></svg>
+      </button>
+      <button class="win-btn" data-win="max" title="最大化">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1"><rect x="2.3" y="2.3" width="7.4" height="7.4" rx="1"/></svg>
+      </button>
+      <button class="win-btn close" data-win="close" title="关闭">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1"><path d="M2.6 2.6l6.8 6.8M9.4 2.6L2.6 9.4"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="body">
+    <!-- 左侧栏 -->
+    <aside class="sidebar" id="sidebar">
+      <div class="side-inner">
+        <div class="brand">
+          <svg class="brand-logo" viewBox="0 0 24 24" fill="currentColor" aria-label="DeepSeek">
+            <path d="M12.9 3.2c.9 1 1.3 2.2 1.2 3.4 2.9.4 5.3 2.2 6.4 4.6.3.6.5 1.3.6 2 .1.5-.3.9-.8.9h-3.1c-.5 0-.9.4-.9.9 0 2.4-2 4.4-4.4 4.4H8.9c-3 0-5.4-2.4-5.4-5.4 0-1.4.5-2.6 1.4-3.5.6-.6 1.5-.2 1.6.6.1.7.4 1.3.9 1.8.2-3.7 2.4-6.9 5.5-8.3.4-.2.8 0 .9.4z"/>
+            <path d="M15.6 16.1c1.7 0 3-1.4 3-3.1 0-.4.3-.7.7-.7h2.9c.5 0 .9.4.8.9-.2 1.5-.8 2.9-1.8 4.1-1.6 1.9-4 3.1-6.6 3.1-1.7 0-3.3-.5-4.6-1.4-.5-.3-.4-1 .2-1.1 1.7-.5 3.1-1.6 4-3.1.2-.3.5-.5.9-.5h.5z"/>
+          </svg>
+          <span class="brand-name">deepseek</span>
+          <span class="brand-badge">HARNESS</span>
+        </div>
+
+        <button class="new-chat" id="newChat">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><path d="M12 8.5v7M8.5 12h7"/>
+          </svg>
+          新会话
+        </button>
+
+        <nav class="nav">
+          <button class="nav-item" data-nav="插件">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 4.5a2 2 0 1 1 4 0V6h2.5a1.5 1.5 0 0 1 1.5 1.5V10h1.5a2 2 0 1 1 0 4H18v2.5a1.5 1.5 0 0 1-1.5 1.5H14v-1.5a2 2 0 1 0-4 0V18H7.5A1.5 1.5 0 0 1 6 16.5V14H4.5a2 2 0 1 1 0-4H6V7.5A1.5 1.5 0 0 1 7.5 6H10V4.5z"/>
+            </svg>
+            插件
+          </button>
+          <button class="nav-item" data-nav="自动化任务">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/>
+            </svg>
+            自动化任务
+          </button>
+          <button class="nav-item" data-nav="IM机器人">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3.5" y="5" width="17" height="12" rx="3.5"/><path d="M8.5 21l3-3.5M8 9.5h.01M12 9.5h.01M16 9.5h.01"/>
+            </svg>
+            IM机器人
+          </button>
+          <button class="nav-item" data-nav="上下文洞察">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 9.5h16M9.5 9.5V20"/>
+            </svg>
+            上下文洞察
+          </button>
+          <button class="nav-item" data-nav="更多">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="7" cy="7" r="1.7"/><circle cx="12" cy="7" r="1.7"/><circle cx="17" cy="7" r="1.7"/>
+              <circle cx="7" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="17" cy="12" r="1.7"/>
+            </svg>
+            更多
+          </button>
+        </nav>
+
+        <div class="ws-header">
+          <span class="ws-title">工作区</span>
+          <div class="ws-actions">
+            <button class="mini-btn" id="wsSearch" title="搜索工作区">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>
+            </button>
+            <button class="mini-btn" id="wsSort" title="排序">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M4 12h7M4 17h4M17 8v9M17 17l3-3M17 17l-3-3"/></svg>
+            </button>
+            <button class="mini-btn" id="wsNew" title="新建工作区">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.2l1.8 2h6.8a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2v-9.5z"/><path d="M12 11v6M9 14h6"/></svg>
+            </button>
+          </div>
+        </div>
+        <button class="ws-item active" id="wsDefault">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.2l1.8 2h6.8a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2v-9.5z"/></svg>
+          默认工作区
+        </button>
+
+        <div class="side-bottom">
+          <div class="user-row">
+            <div class="avatar">访</div>
+            <span class="user-name">访客用户</span>
+            <button class="ver-btn" id="verBtn">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10M12 14l-3.5-3.5M12 14l3.5-3.5M5 18.5h14"/></svg>
+              新版本
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 主区域 -->
+    <main class="main">
+      <div class="main-topbar">
+        <button class="panel-btn" id="panelBtn" title="右侧面板">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M15 5v14"/></svg>
+        </button>
+      </div>
+
+      <div class="stage">
+        <div class="stage-inner">
+          <div class="hero">
+            <svg class="hero-logo" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12.9 3.2c.9 1 1.3 2.2 1.2 3.4 2.9.4 5.3 2.2 6.4 4.6.3.6.5 1.3.6 2 .1.5-.3.9-.8.9h-3.1c-.5 0-.9.4-.9.9 0 2.4-2 4.4-4.4 4.4H8.9c-3 0-5.4-2.4-5.4-5.4 0-1.4.5-2.6 1.4-3.5.6-.6 1.5-.2 1.6.6.1.7.4 1.3.9 1.8.2-3.7 2.4-6.9 5.5-8.3.4-.2.8 0 .9.4z"/>
+              <path d="M15.6 16.1c1.7 0 3-1.4 3-3.1 0-.4.3-.7.7-.7h2.9c.5 0 .9.4.8.9-.2 1.5-.8 2.9-1.8 4.1-1.6 1.9-4 3.1-6.6 3.1-1.7 0-3.3-.5-4.6-1.4-.5-.3-.4-1 .2-1.1 1.7-.5 3.1-1.6 4-3.1.2-.3.5-.5.9-.5h.5z"/>
+            </svg>
+            <span class="hero-text">探索未至之境</span>
+            <span class="hero-badge">预览版</span>
+          </div>
+
+          <div class="meta-row">
+            <div class="menu-wrap drop-down">
+              <button class="meta-btn" data-menu-toggle>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.2l1.8 2h6.8a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2v-9.5z"/></svg>
+                <span class="label">默认工作区</span>
+                <svg class="meta-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg>
+              </button>
+              <div class="menu">
+                <button class="menu-item active"><span class="label">默认工作区</span><svg class="tick" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+                <button class="menu-item"><span class="label">团队工作区</span><svg class="tick" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+                <button class="menu-item"><span class="label">新建工作区</span><svg class="tick" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+              </div>
+            </div>
+
+            <div class="menu-wrap drop-down">
+              <button class="meta-btn" data-menu-toggle>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6L5.5 10l4.6-1.9L12 3.5z"/><path d="M17.5 15.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1z"/></svg>
+                <span class="label">创造模式</span>
+                <svg class="meta-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg>
+              </button>
+              <div class="menu">
+                <button class="menu-item active"><span class="label">创造模式</span><svg class="tick" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+                <button class="menu-item"><span class="label">规划模式</span><svg class="tick" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="composer" id="composer">
+            <textarea id="prompt" rows="1" placeholder="描述你想要构建的内容 ， / 调用指令 ， @ 文件或对话"></textarea>
+            <div class="composer-foot">
+              <div class="foot-left">
+                <button class="round-btn" id="plusBtn" title="添加附件">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"/></svg>
+                </button>
+                <div class="menu-wrap">
+                  <button class="scope-btn" data-menu-toggle>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l7 2.6v5.4c0 4-3 7.4-7 9-4-1.6-7-5-7-9V6.1l7-2.6z"/><path d="M9 11.8l2.2 2.2 4-4.2"/></svg>
+                    <span class="label">工作区内修改</span>
+                    <svg class="meta-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg>
+                  </button>
+                  <div class="menu">
+                    <button class="menu-item active"><span class="label">工作区内修改</span><svg class="tick" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+                    <button class="menu-item"><span class="label">全局修改</span><svg class="tick" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+                    <button class="menu-item"><span class="label">只读模式</span><svg class="tick" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="foot-right">
+                <span class="model">DeepSeek-V4.1-Flash</span>
+                <span class="model-tag">1017</span>
+                <div class="menu-wrap align-right">
+                  <button class="high-btn" data-menu-toggle>
+                    <span class="label">High</span>
+                    <svg class="meta-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg>
+                  </button>
+                  <div class="menu">
+                    <button class="menu-item active"><span class="label">High</span><svg class="tick" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+                    <button class="menu-item"><span class="label">Medium</span><svg class="tick" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+                    <button class="menu-item"><span class="label">Low</span><svg class="tick" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+                  </div>
+                </div>
+                <button class="send-btn" id="sendBtn" title="发送">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5.5M12 5.5l-6 6M12 5.5l6 6"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="mascot" id="mascot" title="点我一下" role="button" tabindex="0" aria-label="和吉祥物互动">
+  <img
+    draggable="false"
+    src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chibi%20anime%20girl%20mascot%2C%20long%20deep%20blue%20wavy%20hair%2C%20white%20frilled%20maid%20headband%2C%20navy%20sailor%20collar%2C%20big%20sparkling%20blue%20eyes%2C%20shy%20blushing%20expression%2C%20soft%20cel%20shading%2C%20kawaii%202d%20character%20illustration%2C%20plain%20white%20background%2C%20upper%20body%20portrait&image_size=portrait_4_3"
+    alt=""
+    onerror="this.parentNode.style.display='none'" />
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  const toastEl = document.getElementById('toast');
+  let toastTimer;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1600);
+  }
+
+  /* 侧栏折叠 */
+  const sidebar = document.getElementById('sidebar');
+  if (window.innerWidth < 760) sidebar.classList.add('collapsed');
+  document.getElementById('toggleSide').addEventListener('click', () => {
+    sidebar.classList.toggle('collapsed');
+  });
+
+  /* 导航 / 工作区 / 新建会话 */
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      item.classList.add('active');
+      toast(item.dataset.nav + ' · 演示占位');
+    });
+  });
+
+  document.getElementById('newChat').addEventListener('click', () => {
+    const ta = document.getElementById('prompt');
+    ta.value = '';
+    ta.style.height = 'auto';
+    syncSend();
+    ta.focus();
+    toast('已新建会话');
+  });
+
+  document.getElementById('wsDefault').addEventListener('click', e => {
+    e.currentTarget.classList.add('active');
+    toast('默认工作区');
+  });
+
+  document.getElementById('verBtn').addEventListener('click', () => toast('当前已是最新版本'));
+  document.getElementById('wsSearch').addEventListener('click', () => toast('搜索工作区（演示）'));
+  document.getElementById('wsSort').addEventListener('click', () => toast('排序方式（演示）'));
+  document.getElementById('wsNew').addEventListener('click', () => toast('新建工作区（演示）'));
+  document.getElementById('panelBtn').addEventListener('click', () => toast('右侧面板（演示）'));
+  document.getElementById('plusBtn').addEventListener('click', () => toast('选择文件或图片（演示）'));
+
+  /* 窗口按钮 */
+  document.querySelectorAll('.win-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.win;
+      toast(type === 'min' ? '最小化（演示）' : type === 'max' ? '最大化（演示）' : '关闭（演示）');
+    });
+  });
+  document.querySelectorAll('.tb-menu').forEach(b => {
+    b.addEventListener('click', () => toast(b.textContent + ' 菜单（演示）'));
+  });
+
+  /* 下拉菜单 */
+  function closeAllMenus(except) {
+    document.querySelectorAll('.menu-wrap.open').forEach(w => {
+      if (w !== except) w.classList.remove('open');
+    });
+  }
+  document.querySelectorAll('.menu-wrap').forEach(wrap => {
+    const trigger = wrap.querySelector('[data-menu-toggle]');
+    const label = trigger.querySelector('.label');
+    trigger.addEventListener('click', e => {
+      e.stopPropagation();
+      const willOpen = !wrap.classList.contains('open');
+      closeAllMenus(wrap);
+      wrap.classList.toggle('open', willOpen);
+    });
+    wrap.querySelectorAll('.menu-item').forEach(item => {
+      item.addEventListener('click', e => {
+        e.stopPropagation();
+        wrap.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        const text = item.querySelector('.label').textContent;
+        if (label) label.textContent = text;
+        wrap.classList.remove('open');
+        toast('已切换为 ' + text);
+      });
+    });
+  });
+  document.addEventListener('click', () => closeAllMenus(null));
+
+  /* 输入框 */
+  const composer = document.getElementById('composer');
+  const ta = document.getElementById('prompt');
+  const sendBtn = document.getElementById('sendBtn');
+
+  function syncSend() {
+    sendBtn.classList.toggle('ready', ta.value.trim().length > 0);
+  }
+  function autoGrow() {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 150) + 'px';
+  }
+  ta.addEventListener('input', () => { autoGrow(); syncSend(); });
+  ta.addEventListener('focus', () => composer.classList.add('focus'));
+  ta.addEventListener('blur', () => composer.classList.remove('focus'));
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      send();
+    }
+  });
+
+  function send() {
+    const text = ta.value.trim();
+    if (!text) {
+      toast('请先输入内容');
+      return;
+    }
+    toast('已发送（界面演示，未接入模型）');
+    ta.value = '';
+    autoGrow();
+    syncSend();
+  }
+  sendBtn.addEventListener('click', send);
+  syncSend();
+
+  /* ---------- 吉祥物：点击变形 + 音效 ---------- */
+  const mascot = document.getElementById('mascot');
+  const mascotImg = mascot.querySelector('img');
+  let audioCtx = null;
+
+  function getAudioCtx() {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  /* 用 Web Audio 合成软萌“啾”声，不依赖外部音频文件 */
+  function playSqueak() {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const base = 520 + Math.random() * 240;   // 每次音高略有不同
+    const master = ctx.createGain();
+    master.gain.value = 0.85;
+    master.connect(ctx.destination);
+
+    // 主体音：上扬后回落，模拟“啾”
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(base * 1.05, t);
+    osc.frequency.exponentialRampToValueAtTime(base * 2.0, t + 0.06);
+    osc.frequency.exponentialRampToValueAtTime(base * 1.2, t + 0.2);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+    osc.connect(g).connect(master);
+    osc.start(t);
+    osc.stop(t + 0.26);
+
+    // 泛音：增加一点弹性的“碗感”
+    const o2 = ctx.createOscillator();
+    const g2 = ctx.createGain();
+    o2.type = 'triangle';
+    o2.frequency.setValueAtTime(base * 3.1, t + 0.02);
+    o2.frequency.exponentialRampToValueAtTime(base * 1.7, t + 0.16);
+    g2.gain.setValueAtTime(0.0001, t + 0.02);
+    g2.gain.exponentialRampToValueAtTime(0.05, t + 0.045);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    o2.connect(g2).connect(master);
+    o2.start(t + 0.02);
+    o2.stop(t + 0.2);
+  }
+
+  /* 挤压 - 回弹 变形 */
+  function squish() {
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    const waves = [
+      [1.22, 0.74, 3 * dir],   // 左右压扁
+      [0.8, 1.2, -3 * dir],    // 上下拉长
+      [1.16, 0.84, 5 * dir]    // 歪头压扁
+    ];
+    const w = waves[Math.floor(Math.random() * waves.length)];
+    mascotImg.animate([
+      { transform: 'scale(1, 1) rotate(0deg)' },
+      { transform: `scale(${w[0]}, ${w[1]}) rotate(${w[2]}deg)`, offset: 0.2 },
+      { transform: `scale(${2 - w[0] * 0.8}, ${2 - w[1] * 0.8}) rotate(${-w[2] * 0.7}deg)`, offset: 0.46 },
+      { transform: 'scale(1.06, 0.95) rotate(1.2deg)', offset: 0.68 },
+      { transform: 'scale(0.99, 1.01)', offset: 0.86 },
+      { transform: 'scale(1, 1) rotate(0deg)' }
+    ], { duration: 620, easing: 'cubic-bezier(.33,1.25,.52,1)' });
+  }
+
+  mascot.addEventListener('click', () => {
+    squish();
+    playSqueak();
+  });
+  mascot.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      squish();
+      playSqueak();
+    }
+  });
+})();
+</script>
+</body>
+</html>
